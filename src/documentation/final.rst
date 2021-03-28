@@ -7,8 +7,8 @@ Visualisation and results formatting
 Documentation of the code in *src.final*.
 
 
-Schelling example
+Plots of O(M)Lhd samples
 =================
 
-.. automodule:: src.final.task_plot_locations
+.. automodule:: src.final.task_plots
     :members:

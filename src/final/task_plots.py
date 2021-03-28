@@ -1,3 +1,10 @@
+"""This module contains the functions used in our solution Jupyter notebook.
+
+neg_to_nan takes an input x of any type and converts it to a "NaN" value, if it is a
+negative numerical
+
+convert_str_to_numerical recodes strings in the survey to sensible numerical values
+"""
 import numpy as np
 import seaborn as sns
 
@@ -19,6 +26,18 @@ from src.config import BLD
 def task_plot(
     depends_on, produces, optimality_criterion="a-optimal", lhs_design="centered"
 ):
+    """Convert negative numbers from string to np.nan.
+
+    Parameters
+    ----------
+    x : int or float or str
+        cell value in dataframe to be converted if eligible
+
+    Returns
+    -------
+    x : int or float or str
+        returns NaN if x was a negative integer before, else returns the input unchanged
+    """
     fig, ax = plt.subplots()
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)

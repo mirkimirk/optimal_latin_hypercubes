@@ -1,5 +1,9 @@
-"""
+"""This module contains the functions used in our solution Jupyter notebook.
 
+neg_to_nan takes an input x of any type and converts it to a "NaN" value, if it is a
+negative numerical
+
+convert_str_to_numerical recodes strings in the survey to sensible numerical values
 """
 import pickle
 
@@ -7,22 +11,34 @@ import numpy as np
 import pytask
 
 from src.config import BLD
-from src.latin_hypercubes import get_next_trust_region_points_latin_hypercube
+from src.model_code.latin_hypercubes import optimal_latin_hypercube_sample
 
 
-def draw_samples(optimality_criterion="a-optimal", lhs_design="centered"):
+def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numActive=3):
+    """Convert negative numbers from string to np.nan.
+
+    Parameters
+    ----------
+    x : int or float or str
+        cell value in dataframe to be converted if eligible
+
+    Returns
+    -------
+    x : int or float or str
+        returns NaN if x was a negative integer before, else returns the input unchanged
+    """
     np.random.seed(1234)
     target_n_points = 10
     first_center = np.ones(2) * 0.25
     first_radius = 0.25
-    first_sample = get_next_trust_region_points_latin_hypercube(
+    first_sample = optimal_latin_hypercube_sample(
         center=first_center,
         radius=first_radius,
         target_n_points=target_n_points,
-        n_iter=1000,
         optimality_criterion=optimality_criterion,
         lhs_design=lhs_design,
-    )
+        numActive=numActive,
+    )[1]
 
     second_center = np.ones(2) * 0.4
     second_radius = 0.25
@@ -35,15 +51,15 @@ def draw_samples(optimality_criterion="a-optimal", lhs_design="centered"):
 
     existing = np.array(existing)
 
-    second_sample = get_next_trust_region_points_latin_hypercube(
+    second_sample = optimal_latin_hypercube_sample(
         center=second_center,
         radius=second_radius,
         target_n_points=target_n_points,
-        n_iter=1000,
         existing_points=existing,
         optimality_criterion=optimality_criterion,
         lhs_design=lhs_design,
-    )
+        numActive=numActive,
+    )[1]
 
     return first_sample, second_sample
 
@@ -55,6 +71,18 @@ def draw_samples(optimality_criterion="a-optimal", lhs_design="centered"):
     }
 )
 def task_get_simulation_draws(produces):
+    """Convert negative numbers from string to np.nan.
+
+    Parameters
+    ----------
+    x : int or float or str
+        cell value in dataframe to be converted if eligible
+
+    Returns
+    -------
+    x : int or float or str
+        returns NaN if x was a negative integer before, else returns the input unchanged
+    """
     first_sample, second_sample = draw_samples()
     with open(produces["first"], "wb") as out_file:
         pickle.dump(first_sample, out_file)
