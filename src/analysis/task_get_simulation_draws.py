@@ -1,9 +1,8 @@
-"""This module contains the functions used in our solution Jupyter notebook.
+"""This module draws two optimal Latin hypercube samples from different trust regions.
 
-neg_to_nan takes an input x of any type and converts it to a "NaN" value, if it is a
-negative numerical
+draw_samples produces two samples from different trust regions.
 
-convert_str_to_numerical recodes strings in the survey to sensible numerical values
+task_get_simulation_draws saves those samples in pickle files.
 """
 import pickle
 
@@ -15,19 +14,30 @@ from src.model_code.latin_hypercubes import optimal_latin_hypercube_sample
 
 
 def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numActive=3):
-    """Convert negative numbers from string to np.nan.
+    """Draw two specified samples from different trust regions for later plotting.
 
     Parameters
     ----------
-    x : int or float or str
-        cell value in dataframe to be converted if eligible
+    optimality_criterion : str
+        One of "a-optimal", "d-optimal", "e-optimal",
+        "t-optimal", "g-optimal".
+    lhs_design : str
+        One of "centered", "released". "Centered" places points in the middle of each
+        bin and finds optimal midpoint Latin hypercube design. "Released" uses a
+        Newton-type algorithm to then optimally spread the points within their assigned
+        bins.
+    numActive : int
+        Number of row pairs of S to build and use for exchanging values in their
+        columns.
 
     Returns
     -------
-    x : int or float or str
+    first_sample : np.ndarray
+        returns NaN if x was a negative integer before, else returns the input unchanged
+    second_sample : np.ndarray
         returns NaN if x was a negative integer before, else returns the input unchanged
     """
-    np.random.seed(1234)
+    np.random.seed(12345)
     target_n_points = 10
     first_center = np.ones(2) * 0.25
     first_radius = 0.25
@@ -75,12 +85,14 @@ def task_get_simulation_draws(produces):
 
     Parameters
     ----------
-    x : int or float or str
-        cell value in dataframe to be converted if eligible
+    produces : path
+        Variable for pytask. Specifies locations to output the samples to.
 
     Returns
     -------
-    x : int or float or str
+    first_sample : np.ndarray
+        returns NaN if x was a negative integer before, else returns the input unchanged
+    second_sample : np.ndarray
         returns NaN if x was a negative integer before, else returns the input unchanged
     """
     first_sample, second_sample = draw_samples()

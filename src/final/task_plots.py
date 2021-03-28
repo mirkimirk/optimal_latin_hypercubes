@@ -1,9 +1,7 @@
-"""This module contains the functions used in our solution Jupyter notebook.
+"""This module produces a plot illustrating a possible trust region application.
 
-neg_to_nan takes an input x of any type and converts it to a "NaN" value, if it is a
-negative numerical
-
-convert_str_to_numerical recodes strings in the survey to sensible numerical values
+task_plot is a function that takes as inputs the location of sample data and where to
+output, and yields a plot.
 """
 import numpy as np
 import seaborn as sns
@@ -23,24 +21,27 @@ from src.config import BLD
     }
 )
 @pytask.mark.produces(BLD / "figures" / "plot.pdf")
-def task_plot(
-    depends_on, produces, optimality_criterion="a-optimal", lhs_design="centered"
-):
+def task_plot(depends_on, produces):
     """Convert negative numbers from string to np.nan.
 
     Parameters
     ----------
-    x : int or float or str
-        cell value in dataframe to be converted if eligible
+    depends_on : path
+        Variable for pytask. Specifies dependency, i.e., the data to plot.
+    produces : path
+        Variable for pytask. Specifies location to output the plot to.
 
     Returns
     -------
-    x : int or float or str
-        returns NaN if x was a negative integer before, else returns the input unchanged
+    fig : figure
+        A plot showing a possible trust region application.
     """
     fig, ax = plt.subplots()
+    fig.suptitle("Illustration of trust region application with reused sample points")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
+    ax.set_ylabel("$F(x_2)$")
+    ax.set_xlabel("$F(x_1)$")
 
     first_sample = pickle.load(open(depends_on["first"], "rb"))
     second_sample = pickle.load(open(depends_on["second"], "rb"))

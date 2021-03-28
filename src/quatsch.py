@@ -3,8 +3,8 @@
 The function optimal_latin_hypercube_sample uses Park's (1994) algorithm to find an
 optimal (midpoint) Latin hypercube design. At this point, only the first stage of the
 algorithm – finding an optimal midpoint Latin hypercube – is implemented. The second
-stage of the algorithm optimally releases each point within its assigned bin. (The
-second stage is not yet implemented.)
+stage of the algorithm, i.e., optimally releasing each point within its assigned bin,
+will be implemented later.
 
 neg_to_nan takes an input x of any type and converts it to a "NaN" value, if it is a
 negative numerical
@@ -30,7 +30,6 @@ OPTIMALITY_CRITERIA = {
 
 def optimal_latin_hypercube_sample(
     target_n_points,
-    S=None,
     center=None,
     radius=0.5,
     existing_points=None,
@@ -38,20 +37,9 @@ def optimal_latin_hypercube_sample(
     lhs_design="centered",
     numActive=3,
 ):
-    """Generate the optimal (midpoint) Latin hypercube sample (O(M)Lhd).
+    """Generate new points at which the criterion should be evaluated.
 
-    This function implements Park's (1994) algorithm for finding an O(M)Lhd either from
-    a supplied MLhd, or a randomly generated one. The region of interest is the unit
-    cube per default. The algorithm consists of two stages: finding an OMLhd, and in the
-    second stage to find an optimal Latin hypercube by releasing the points within their
-    optimal bins. (The second stage is not yet implemented).
-
-    In the first stage, two steps are performed: first, the impact of a given number of
-    row pairs (rows of the sample S) on the objective function is evaluated, and the
-    pairs with the most optimizing impact are selected. In the second step, all
-    potential (even-numbered) combinations of columns are evaluated by exchanging their
-    values in the given two rows. This is done for all active pairs of rows and repeated
-    until the objective function does not change anymore.
+    This function implements
 
     Parameters
     ----------
@@ -59,14 +47,10 @@ def optimal_latin_hypercube_sample(
         Target number of points in the trust region at which criterion
         values are known. The actual number can be larger than this
         if the existing points are badly spaced.
-    S : np.ndarray
-        An existing midpoint Latin hypercube sample in the region of interested that can
-        be used as a starting point for the algorithm. If not specified, a random Lhd
-        is generated instead as a starting point.
     center : np.ndarray
-        Center of the current trust region. Default is 0.5.
+        Center of the current trust region.
     radius : float
-        Radius of the current trust region. Default is 0.5
+        Radius of the current trust region.
     existing_points : np.ndarray
         2d Array where each row is a parameter vector at which
         the criterion has already been evaluated.
@@ -78,16 +62,10 @@ def optimal_latin_hypercube_sample(
         bin and finds optimal midpoint Latin hypercube design. "Released" uses a
         Newton-type algorithm to then optimally spread the points within their assigned
         bins.
-    numActive : int
-        Number of row pairs of S to build and use for exchanging values in their
-        columns.
-
     Returns
     -------
     f_0 : float
-        Value of objective function if optimal sample is evaluated.
-    S : np.ndarray
-        Optimal (midpoint) Latin hypercube sample.
+        Value of objective function
     """
     if center is None:
         center = np.ones(target_n_points) * 0.5
@@ -95,13 +73,12 @@ def optimal_latin_hypercube_sample(
     dim = len(center)
 
     if existing_points is None:
-        if S is None:
-            upscaled_points = _create_upscaled_lhs_sample(
-                dim=dim,
-                n_samples=target_n_points,
-                lhs_design="centered",
-            )
-            S = _scale_down_points(upscaled_points, center, radius, target_n_points)
+        upscaled_points = _create_upscaled_lhs_sample(
+            dim=dim,
+            n_samples=target_n_points,
+            lhs_design="centered",
+        )
+        S = _scale_down_points(upscaled_points, center, radius, target_n_points)
         # Step 1
         f_0, active_pairs = _step_1(
             criterion_func=criterion_func, S=S, numActive=numActive
@@ -156,20 +133,13 @@ def _step_1(criterion_func, S, numActive):
 
     Parameters
     ----------
-    criterion_func : function
-        Objective function used to evaluate the quality of the Lhd samples.
-    S : np.ndarray
-        Initial midpoint Latin hypercube sample to modify by the algorithm.
-    numActive : int
-        Number of row pairs of S to build and use for exchanging values in their
-        columns.
+    criterion_func : int or float or str
+        cell value in dataframe to be converted if eligible
 
     Returns
     -------
-    f_0 : float
-        Value of objective function if initial sample is evaluated.
-    active_pairs : list of tuples
-        List of row pairs to evaluate in second step.
+    x : int or float or str
+        returns NaN if x was a negative integer before, else returns the input unchanged
     """
     f_0 = criterion_func(S)
     n = len(S)
@@ -189,26 +159,13 @@ def _step_2(criterion_func, dim, S, f_0, numActive, active_pairs):
 
     Parameters
     ----------
-    criterion_func : function
-        Objective function used to evaluate the quality of the Lhd samples.
-    dim : int
-        Number of variables in the design space.
-    S : np.ndarray
-        Initial midpoint Latin hypercube sample to modify by the algorithm.
-    f_0 : float
-        Value of objective function if initial sample is evaluated.
-    numActive : int
-        Number of row pairs of S to build and use for exchanging values in their
-        columns.
-    active_pairs : list of tuples
-        List of row pairs to evaluate in second step.
+    x : int or float or str
+        cell value in dataframe to be converted if eligible
 
     Returns
     -------
-    f_0 : float
-        Value of objective function if optimal sample is evaluated.
-    S : np.ndarray
-        Optimal (midpoint) Latin hypercube sample.
+    x : int or float or str
+        returns NaN if x was a negative integer before, else returns the input unchanged
     """
     it = (2 ** (dim - 1)) - 1
     n_components = np.where(np.arange(dim + 1) % 2 == 0)[0][1:]
@@ -251,23 +208,17 @@ def _step_2(criterion_func, dim, S, f_0, numActive, active_pairs):
 
 
 def _scale_up_points(points, center, radius, target_n_points):
-    """Scales existing Lhd points up to prepare them for merging.
+    """Convert negative numbers from string to np.nan.
 
     Parameters
     ----------
-    points : np.ndarray
-        Points to scale.
-    center : np.ndarray
-        Center of the current trust region.
-    radius : float
-        Radius of the current trust region.
-    target_n_points : int
-        Number of points.
+    x : int or float or str
+        cell value in dataframe to be converted if eligible
 
     Returns
     -------
-    scaled : np.ndarray
-        Upscaled points.
+    x : int or float or str
+        returns NaN if x was a negative integer before, else returns the input unchanged
     """
     lower = center - radius
     scaled = (points - lower) * target_n_points / (2 * radius)
@@ -275,23 +226,17 @@ def _scale_up_points(points, center, radius, target_n_points):
 
 
 def _scale_down_points(points, center, radius, target_n_points):
-    """Scales existing Lhd points down to make a Lhd.
+    """Convert negative numbers from string to np.nan.
 
     Parameters
     ----------
-    points : np.ndarray
-        Points to scale.
-    center : np.ndarray
-        Center of the current trust region.
-    radius : float
-        Radius of the current trust region.
-    target_n_points : int
-        Number of points.
+    x : int or float or str
+        cell value in dataframe to be converted if eligible
 
     Returns
     -------
-    scaled : np.ndarray
-        Downscaled points.
+    x : int or float or str
+        returns NaN if x was a negative integer before, else returns the input unchanged
     """
     lower = center - radius
     scaled = points / target_n_points * (2 * radius) + lower
@@ -299,19 +244,17 @@ def _scale_down_points(points, center, radius, target_n_points):
 
 
 def _get_empty_bin_info(existing_upscaled, target_n_points):
-    """Get info on empty bins.
+    """Convert negative numbers from string to np.nan.
 
     Parameters
     ----------
-    existing_upscaled : np.ndarray
-        Existing points carrying info on their bins
-    target_n_points : int
-        Number of points.
+    x : int or float or str
+        cell value in dataframe to be converted if eligible
 
     Returns
     -------
-    out : np.ndarray
-        Array containing tuples specifying empty bins.
+    x : int or float or str
+        returns NaN if x was a negative integer before, else returns the input unchanged
     """
     dim = existing_upscaled.shape[1]
     empty_bins = []
@@ -329,24 +272,17 @@ def _get_empty_bin_info(existing_upscaled, target_n_points):
 
 
 def _create_upscaled_lhs_sample(dim, n_samples, lhs_design="random"):
-    """Create random Lhs sample
+    """Convert negative numbers from string to np.nan.
 
     Parameters
     ----------
-    dim : int
-        Number of variables in the design space.
-    n_samples : int
-        Number of total samples.
-    lhs_design : str
-        One of "centered", "released". "Centered" places points in the middle of each
-        bin and finds optimal midpoint Latin hypercube design. "Released" uses a
-        Newton-type algorithm to then optimally spread the points within their assigned
-        bins.
+    x : int or float or str
+        cell value in dataframe to be converted if eligible
 
     Returns
     -------
-    sample : np.ndarray
-        Random Lhd.
+    x : int or float or str
+        returns NaN if x was a negative integer before, else returns the input unchanged
     """
     sample = np.zeros((n_samples, dim))
     for j in range(dim):
@@ -394,3 +330,19 @@ def _extend_upscaled_lhs_sample(empty_bins, target_n_points, lhs_design="random"
         raise ValueError("Invalid latin hypercube design.")
 
     return sample
+
+
+target_n_points = 10
+first_center = np.ones(2) * 0.25
+first_radius = 0.25
+optimality_criterion = "d-optimal"
+lhs_design = "centered"
+numActive = 3
+first_sample = optimal_latin_hypercube_sample(
+    center=first_center,
+    radius=first_radius,
+    target_n_points=target_n_points,
+    optimality_criterion=optimality_criterion,
+    lhs_design=lhs_design,
+    numActive=numActive,
+)[1]
