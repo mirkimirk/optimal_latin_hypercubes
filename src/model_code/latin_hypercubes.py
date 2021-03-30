@@ -5,11 +5,6 @@ optimal (midpoint) Latin hypercube design. At this point, only the first stage o
 algorithm – finding an optimal midpoint Latin hypercube – is implemented. The second
 stage of the algorithm optimally releases each point within its assigned bin. (The
 second stage is not yet implemented.)
-
-neg_to_nan takes an input x of any type and converts it to a "NaN" value, if it is a
-negative numerical
-
-convert_str_to_numerical recodes strings in the survey to sensible numerical values
 """
 from itertools import combinations
 
@@ -30,13 +25,15 @@ OPTIMALITY_CRITERIA = {
 
 def optimal_latin_hypercube_sample(
     target_n_points,
-    S=None,
-    center=None,
+    S_init=None,
+    center=np.ones(2) * 0.5,
     radius=0.5,
     existing_points=None,
     optimality_criterion="d-optimal",
     lhs_design="centered",
     numActive=3,
+    numRand=None,
+    n_iter=100,
 ):
     """Generate the optimal (midpoint) Latin hypercube sample (O(M)Lhd).
 
@@ -59,95 +56,129 @@ def optimal_latin_hypercube_sample(
         Target number of points in the trust region at which criterion
         values are known. The actual number can be larger than this
         if the existing points are badly spaced.
-    S : np.ndarray
+    S_init : np.ndarray, optional
         An existing midpoint Latin hypercube sample in the region of interested that can
         be used as a starting point for the algorithm. If not specified, a random Lhd
         is generated instead as a starting point.
-    center : np.ndarray
-        Center of the current trust region. Default is 0.5.
-    radius : float
-        Radius of the current trust region. Default is 0.5
-    existing_points : np.ndarray
+    center : one-dimensional np.ndarray, optional
+        Center of the current trust region. Default is a vector of length 2 with both
+        values set to 0.5.
+    radius : float, optional
+        Radius of the current trust region.
+    existing_points : np.ndarray, optional
         2d Array where each row is a parameter vector at which
-        the criterion has already been evaluated.
-    optimality_criterion : str
+        the criterion has already been evaluated. This is ignored, if S_0 is provided.
+    optimality_criterion : str, optional
         One of "a-optimal", "d-optimal", "e-optimal",
         "t-optimal", "g-optimal".
-    lhs_design : str
+    lhs_design : str, optional
         One of "centered", "released". "Centered" places points in the middle of each
         bin and finds optimal midpoint Latin hypercube design. "Released" uses a
         Newton-type algorithm to then optimally spread the points within their assigned
         bins.
-    numActive : int
+    numActive : int, optional
         Number of row pairs of S to build and use for exchanging values in their
         columns.
+    numRand : int, optional
+        Number of random row pairs to try after successful finish of first stage to
+        reduce risk of finding a non-optimal OMLhd. Default is 3 * target_n_points // 5.
+    n_iter : int, optional
+        Number of random MLhds to try out as a starting point of the algorithm.
 
     Returns
     -------
-    f_0 : float
+    f : float
         Value of objective function if optimal sample is evaluated.
     S : np.ndarray
         Optimal (midpoint) Latin hypercube sample.
     """
-    if center is None:
-        center = np.ones(target_n_points) * 0.5
     criterion_func = OPTIMALITY_CRITERIA[optimality_criterion]
     dim = len(center)
+    if numRand is None:
+        numRand = 3 * target_n_points // 5
 
-    if existing_points is None:
-        if S is None:
-            upscaled_points = _create_upscaled_lhs_sample(
-                dim=dim,
-                n_samples=target_n_points,
-                lhs_design="centered",
-            )
-            S = _scale_down_points(upscaled_points, center, radius, target_n_points)
+    f_candidates = []
+    S_candidates = []
+    for _ in range(n_iter):
+        S_0 = S_init
+        if existing_points is None:
+            if S_0 is None:
+                upscaled_points = _create_upscaled_lhs_sample(
+                    dim=dim,
+                    n_samples=target_n_points,
+                    lhs_design="centered",
+                )
+                S_0 = _scale_down_points(
+                    upscaled_points, center, radius, target_n_points
+                )
+
+        else:
+            if S_0 is None:
+                existing_upscaled = _scale_up_points(
+                    existing_points,
+                    center,
+                    radius,
+                    target_n_points,
+                )
+                empty_bins = _get_empty_bin_info(existing_upscaled, target_n_points)
+                new = _extend_upscaled_lhs_sample(
+                    empty_bins=empty_bins,
+                    target_n_points=target_n_points,
+                    lhs_design="centered",
+                )
+                upscaled_points = np.row_stack([existing_upscaled, new])
+                S_0 = _scale_down_points(
+                    upscaled_points, center, radius, target_n_points
+                )
+
         # Step 1
         f_0, active_pairs = _step_1(
-            criterion_func=criterion_func, S=S, numActive=numActive
+            criterion_func=criterion_func, S=S_0, numActive=numActive
         )
+
         # Step 2
-        f_0, S = _step_2(
+        f_1, S_1 = _step_2(
             criterion_func=criterion_func,
             dim=dim,
-            S=S,
-            f_0=f_0,
-            numActive=numActive,
+            S=S_0,
+            crit_val=f_0,
+            n_pairs=numActive,
             active_pairs=active_pairs,
         )
 
-    else:
-        existing_upscaled = _scale_up_points(
-            existing_points,
-            center,
-            radius,
-            target_n_points,
+        # Double check with random pairs that are not the same as the active pairs
+        potential_random_pairs = np.array(
+            list(set(combinations(range(target_n_points), 2)) - set(active_pairs))
         )
-        empty_bins = _get_empty_bin_info(existing_upscaled, target_n_points)
-        new = _extend_upscaled_lhs_sample(
-            empty_bins=empty_bins,
-            target_n_points=target_n_points,
-            lhs_design="centered",
+        random_pairs = np.random.default_rng().choice(
+            a=potential_random_pairs,
+            size=numRand,
+            replace=False,
+            axis=0,
+            shuffle=False,  # saves some time
         )
-        upscaled_points = np.row_stack([existing_upscaled, new])
-        S = _scale_down_points(upscaled_points, center, radius, target_n_points)
-        # Step 1
-        f_0, active_pairs = _step_1(
-            criterion_func=criterion_func, S=S, numActive=numActive
-        )
-        # Step 2
-        f_0, S = _step_2(
+        f_2, S_2 = _step_2(
             criterion_func=criterion_func,
             dim=dim,
-            S=S,
-            f_0=f_0,
-            numActive=numActive,
-            active_pairs=active_pairs,
+            S=S_1,
+            crit_val=f_1,
+            n_pairs=numRand,
+            active_pairs=random_pairs,
         )
+
+        f_candidates.append(f_2)
+        S_candidates.append(S_2)
+
+    best = np.argmin(f_candidates)
+
+    f = f_candidates[best]
+    S = S_candidates[best]
+
+    # Second stage of algorithm - Newton-type optimization
     if lhs_design == "released":
         pass
 
-    return f_0, S
+    return f, S
 
 
 def _step_1(criterion_func, S, numActive):
@@ -166,24 +197,24 @@ def _step_1(criterion_func, S, numActive):
 
     Returns
     -------
-    f_0 : float
+    crit_val : float
         Value of objective function if initial sample is evaluated.
     active_pairs : list of tuples
-        List of row pairs to evaluate in second step.
+        List of active row pairs to evaluate in second step.
     """
-    f_0 = criterion_func(S)
+    crit_val = criterion_func(S)
     n = len(S)
     function_values = np.empty(n)
     for i in range(n):
         function_values[i] = criterion_func(np.delete(arr=S, obj=i, axis=0))
-    pairing_candidates = np.argsort(function_values)[:numActive]
-    # take the first numActive combinations of the pairing_candidates
-    active_pairs = list(combinations(pairing_candidates, 2))[:numActive]
+    pairing_candidates = np.argsort(function_values)
+    # take the first numActive combinations of the first numActive pairing_candidates
+    active_pairs = list(combinations(pairing_candidates[:numActive], 2))[:numActive]
 
-    return f_0, active_pairs
+    return crit_val, active_pairs
 
 
-def _step_2(criterion_func, dim, S, f_0, numActive, active_pairs):
+def _step_2(criterion_func, dim, S, crit_val, n_pairs, active_pairs):
     """
     Implement the second step of the first stage of Park's (1994) algorithm for OMLHD.
 
@@ -195,9 +226,9 @@ def _step_2(criterion_func, dim, S, f_0, numActive, active_pairs):
         Number of variables in the design space.
     S : np.ndarray
         Initial midpoint Latin hypercube sample to modify by the algorithm.
-    f_0 : float
+    crit_val : float
         Value of objective function if initial sample is evaluated.
-    numActive : int
+    n_pairs : int
         Number of row pairs of S to build and use for exchanging values in their
         columns.
     active_pairs : list of tuples
@@ -205,23 +236,25 @@ def _step_2(criterion_func, dim, S, f_0, numActive, active_pairs):
 
     Returns
     -------
-    f_0 : float
+    f_1 : float
         Value of objective function if optimal sample is evaluated.
     S : np.ndarray
         Optimal (midpoint) Latin hypercube sample.
     """
     it = (2 ** (dim - 1)) - 1
     n_components = np.where(np.arange(dim + 1) % 2 == 0)[0][1:]
-    switching_components_list = []
     # loop over even-numbered combinations
-    for i in n_components:
-        switching_components_list.append(list(combinations(range(dim), i)))
+    switching_components_list = [
+        list(combinations(range(dim), i)) for i in n_components
+    ]
+    # for i in n_components:
+    #     switching_components_list.append(list(combinations(range(dim), i)))
     # flatten list of lists
     switching_components = [
         item for sublist in switching_components_list for item in sublist
     ]
     i = 0
-    while i < numActive:
+    while i < n_pairs:
         active_pair = active_pairs[i]
         first_row = active_pair[0]
         second_row = active_pair[1]
@@ -238,16 +271,17 @@ def _step_2(criterion_func, dim, S, f_0, numActive, active_pairs):
         S_temp[([first_row], [second_row]), winning_switch] = S[
             ([second_row], [first_row]), winning_switch
         ]
-        if criterion_func(S_temp) < f_0:
+        if criterion_func(S_temp) < crit_val:
             S = S_temp
-            f_0, active_pairs = _step_1(
-                criterion_func=criterion_func, S=S, numActive=numActive
+            crit_val, active_pairs = _step_1(
+                criterion_func=criterion_func, S=S, numActive=n_pairs
             )
+            i = 0
             continue
         else:
             i += 1
 
-    return f_0, S
+    return crit_val, S
 
 
 def _scale_up_points(points, center, radius, target_n_points):
@@ -328,8 +362,8 @@ def _get_empty_bin_info(existing_upscaled, target_n_points):
     return out
 
 
-def _create_upscaled_lhs_sample(dim, n_samples, lhs_design="random"):
-    """Create random Lhs sample
+def _create_upscaled_lhs_sample(dim, n_samples, lhs_design="centered"):
+    """Create random Lhs sample.
 
     Parameters
     ----------
@@ -337,7 +371,7 @@ def _create_upscaled_lhs_sample(dim, n_samples, lhs_design="random"):
         Number of variables in the design space.
     n_samples : int
         Number of total samples.
-    lhs_design : str
+    lhs_design : str, optional
         One of "centered", "released". "Centered" places points in the middle of each
         bin and finds optimal midpoint Latin hypercube design. "Released" uses a
         Newton-type algorithm to then optimally spread the points within their assigned
@@ -363,17 +397,24 @@ def _create_upscaled_lhs_sample(dim, n_samples, lhs_design="random"):
 
 
 def _extend_upscaled_lhs_sample(empty_bins, target_n_points, lhs_design="random"):
-    """Convert negative numbers from string to np.nan.
+    """Use previously generated points in trust region and fill out remaining bins.
 
     Parameters
     ----------
-    x : int or float or str
-        cell value in dataframe to be converted if eligible
+    emptry_bins : np.ndarray
+        Array containing tuples specifying empty bins.
+    target_n_points : int
+        Number of points.
+    lhs_design : str, optional
+        One of "centered", "released". "Centered" places points in the middle of each
+        bin and finds optimal midpoint Latin hypercube design. "Released" uses a
+        Newton-type algorithm to then optimally spread the points within their assigned
+        bins.
 
     Returns
     -------
-    x : int or float or str
-        returns NaN if x was a negative integer before, else returns the input unchanged
+    sample : np.ndarray
+        Existing points extended to Lhd.
     """
     mask = empty_bins == -1  # whats this for? "-1"?
     dim = empty_bins.shape[1]

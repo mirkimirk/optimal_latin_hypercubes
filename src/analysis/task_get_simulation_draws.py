@@ -37,7 +37,7 @@ def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numAct
     second_sample : np.ndarray
         returns NaN if x was a negative integer before, else returns the input unchanged
     """
-    np.random.seed(12345)
+    np.random.seed(1234)
     target_n_points = 10
     first_center = np.ones(2) * 0.25
     first_radius = 0.25
@@ -71,13 +71,18 @@ def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numAct
         numActive=numActive,
     )[1]
 
-    return first_sample, second_sample
+    full_region = optimal_latin_hypercube_sample(
+        30,
+    )[1]
+
+    return first_sample, second_sample, full_region
 
 
 @pytask.mark.produces(
     {
-        "first": BLD / "data" / "first_sample.pickle",
-        "second": BLD / "data" / "second_sample.pickle",
+        "first": BLD / "data" / "first.pickle",
+        "second": BLD / "data" / "second.pickle",
+        "full": BLD / "data" / "full.pickle",
     }
 )
 def task_get_simulation_draws(produces):
@@ -95,8 +100,10 @@ def task_get_simulation_draws(produces):
     second_sample : np.ndarray
         returns NaN if x was a negative integer before, else returns the input unchanged
     """
-    first_sample, second_sample = draw_samples()
-    with open(produces["first"], "wb") as out_file:
-        pickle.dump(first_sample, out_file)
-    with open(produces["second"], "wb") as out_file:
-        pickle.dump(second_sample, out_file)
+    sample_names = list(produces.keys())
+    samples = draw_samples()
+    for x, y in zip(sample_names, samples):
+        globals()[x] = y
+    for i in sample_names:
+        with open(produces[i], "wb") as out_file:
+            pickle.dump(eval(i), out_file)
