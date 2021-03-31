@@ -71,11 +71,7 @@ def task_plots(depends_on, produces):
     plt.savefig(produces)
 
 
-@pytask.mark.depends_on(
-    {
-        "full": BLD / "data" / "full.pickle",
-    }
-)
+@pytask.mark.depends_on(BLD / "data" / "full.pickle")
 @pytask.mark.produces(BLD / "figures" / "plot_full.pdf")
 def task_full_plot(depends_on, produces):
     """Draw the OMLhd found by Park's algorithm.
@@ -99,7 +95,7 @@ def task_full_plot(depends_on, produces):
     ax.set_ylabel("$F(x_2)$")
     ax.set_xlabel("$F(x_1)$")
 
-    full = pickle.load(open(depends_on["full"], "rb"))
+    full = pickle.load(open(depends_on, "rb"))
     sns.regplot(
         x=full[:, 0],
         y=full[:, 1],
@@ -113,6 +109,81 @@ def task_full_plot(depends_on, produces):
     for i in np.arange(0, 1, 1 / n):
         plt.axhline(i)
         plt.axvline(i)
+
+    plt.savefig(produces)
+
+
+@pytask.mark.depends_on(BLD / "data" / "full2.pickle")
+@pytask.mark.produces(BLD / "figures" / "plot_full2.pdf")
+def task_full2_plot(depends_on, produces):
+    """Draw the OMLhd found by Park's algorithm.
+
+    Parameters
+    ----------
+    depends_on : path
+        Variable for pytask. Specifies dependency, i.e., the data to plot.
+    produces : path
+        Variable for pytask. Specifies location to output the plot to.
+
+    Returns
+    -------
+    fig : figure
+        A plot.
+    """
+    fig, ax = plt.subplots()
+    fig.suptitle("Another showcase of Lhd algorithm")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("$F(x_2)$")
+    ax.set_xlabel("$F(x_1)$")
+
+    full = pickle.load(open(depends_on, "rb"))
+    sns.regplot(
+        x=full[:, 0],
+        y=full[:, 1],
+        ax=ax,
+        fit_reg=False,
+        color="darkblue",
+        scatter_kws={"alpha": 0.4},
+    )
+
+    n = len(full[:, 0])
+    for i in np.arange(0, 1, 1 / n):
+        plt.axhline(i)
+        plt.axvline(i)
+
+    plt.savefig(produces)
+
+
+@pytask.mark.depends_on(BLD / "data" / "crit_val_list.pickle")
+@pytask.mark.produces(BLD / "figures" / "plot_convergence.pdf")
+def task_crits_plot(depends_on, produces):
+    """Draw the OMLhd found by Park's algorithm.
+
+    Parameters
+    ----------
+    depends_on : path
+        Variable for pytask. Specifies dependency, i.e., the data to plot.
+    produces : path
+        Variable for pytask. Specifies location to output the plot to.
+
+    Returns
+    -------
+    fig : figure
+        A plot.
+    """
+    fig, ax = plt.subplots()
+    fig.suptitle("Showcase of Lhd algorithm")
+    ax.set_ylabel("$Criterion Value$")
+    ax.set_xlabel("$Iteration$")
+
+    full = pickle.load(open(depends_on, "rb"))
+
+    plt.plot(full[0])
+
+    # for i in np.arange(0, 1, 1 / n):
+    #     plt.axhline(i)
+    #     plt.axvline(i)
 
     plt.savefig(produces)
 

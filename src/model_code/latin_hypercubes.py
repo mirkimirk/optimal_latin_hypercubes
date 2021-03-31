@@ -104,7 +104,7 @@ def optimal_latin_hypercube_sample(
         Optimal (midpoint) Latin hypercube sample.
     """
     criterion_func = OPTIMALITY_CRITERIA[optimality_criterion]
-    threshold = 8
+    threshold = 8  # my arbitrary choice for too "high-dimensional"
     if (S_init is not None and dim != S_init.shape[1]) or (
         center is not None and dim != len(center)
     ):
@@ -117,9 +117,9 @@ def optimal_latin_hypercube_sample(
         numRand = 3 * target_n_points // 5
     if n_iter is None:
         if dim < threshold:
-            n_iter = 100
+            n_iter = 20
         else:
-            n_iter = 200
+            n_iter = 40
 
     f_candidates = []
     S_candidates = []

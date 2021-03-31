@@ -104,7 +104,7 @@ def optimal_latin_hypercube_sample(
         Optimal (midpoint) Latin hypercube sample.
     """
     criterion_func = OPTIMALITY_CRITERIA[optimality_criterion]
-    threshold = 8
+    threshold = 8  # my arbitrary choice for too "high-dimensional"
     if (S_init is not None and dim != S_init.shape[1]) or (
         center is not None and dim != len(center)
     ):
@@ -117,16 +117,17 @@ def optimal_latin_hypercube_sample(
         numRand = 3 * target_n_points // 5
     if n_iter is None:
         if dim < threshold:
-            n_iter = 100
+            n_iter = 20
         else:
-            n_iter = 200
+            n_iter = 40
 
     f_candidates = []
     S_candidates = []
 
+    crit_vals_in_each_iteration = []
     current_best = None
-    for _ in range(n_tries):
-        if current_best is None and S_init is not None:
+    for t in range(n_tries):
+        if t == 0 and S_init is not None:
             S_0 = S_init
         elif existing_points is not None:
             existing_upscaled = _scale_up_points(
@@ -149,7 +150,9 @@ def optimal_latin_hypercube_sample(
                 lhs_design="centered",
             )
         current_best = S_0
-        for _dummy in range(n_iter):
+
+        crit_vals = []
+        for _ in range(n_iter):
             # Step 1
             f_0, active_pairs = _step_1(
                 criterion_func=criterion_func, sample=current_best, numActive=numActive
@@ -187,6 +190,11 @@ def optimal_latin_hypercube_sample(
                 threshold=threshold,
             )
 
+            crit_vals.append(best_crit)
+
+        # Save each critical value to later plot convergence rate
+        crit_vals_in_each_iteration.append(crit_vals)
+
         f_candidates.append(best_crit)
         S_candidates.append(current_best)
 
@@ -201,7 +209,7 @@ def optimal_latin_hypercube_sample(
     if lhs_design == "released":
         pass
 
-    return f, S
+    return S, f, crit_vals_in_each_iteration
 
 
 def _step_1(criterion_func, sample, numActive):
@@ -427,10 +435,12 @@ def _create_upscaled_lhs_sample(dim, n_samples, lhs_design="centered"):
     """
     sample = np.zeros((n_samples, dim))
     for j in range(dim):
-        sample[:, j] = np.random.choice(n_samples, replace=False, size=n_samples)
+        sample[:, j] = np.random.default_rng().choice(
+            n_samples, replace=False, size=n_samples
+        )
 
     if lhs_design == "random":
-        sample += np.random.uniform(size=sample.shape)
+        sample += np.random.default_rng().uniform(size=sample.shape)
     elif lhs_design == "centered":
         sample += 0.5
     else:
@@ -465,13 +475,15 @@ def _extend_upscaled_lhs_sample(empty_bins, target_n_points, lhs_design="random"
     for j in range(dim):
         empty = empty_bins[:, j].copy()
         n_duplicates = mask[:, j].sum()
-        empty[mask[:, j]] = np.random.choice(
+        empty[mask[:, j]] = np.random.default_rng().choice(
             target_n_points, replace=False, size=n_duplicates
         )
-        sample[:, j] = np.random.choice(empty, replace=False, size=len(empty))
+        sample[:, j] = np.random.default_rng().choice(
+            empty, replace=False, size=len(empty)
+        )
 
     if lhs_design == "random":
-        sample = sample + np.random.uniform(size=sample.shape)
+        sample = sample + np.random.default_rng().uniform(size=sample.shape)
     elif lhs_design == "centered":
         sample = sample + 0.5
     else:
@@ -480,4 +492,6 @@ def _extend_upscaled_lhs_sample(empty_bins, target_n_points, lhs_design="random"
     return sample
 
 
-first_sample = optimal_latin_hypercube_sample(10, 5)[0]
+first_sample, critival, all_the_values = optimal_latin_hypercube_sample(10, 3)
+
+all_the_values[0]

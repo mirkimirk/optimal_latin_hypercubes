@@ -73,9 +73,17 @@ def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numAct
         numActive=numActive,
     )[0]
 
-    full_region = optimal_latin_hypercube_sample(20, 2)[0]
+    full_region, F_crit, crit_val_list = optimal_latin_hypercube_sample(15, 2)
+    full_region2, F_crit2, crit_val_list2 = optimal_latin_hypercube_sample(15, 2)
 
-    return first_sample, second_sample, full_region
+    return (
+        first_sample,
+        second_sample,
+        full_region,
+        full_region2,
+        crit_val_list,
+        crit_val_list2,
+    )
 
 
 @pytask.mark.produces(
@@ -83,6 +91,9 @@ def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numAct
         "first": BLD / "data" / "first.pickle",
         "second": BLD / "data" / "second.pickle",
         "full": BLD / "data" / "full.pickle",
+        "full2": BLD / "data" / "full2.pickle",
+        "crit_val_list": BLD / "data" / "crit_val_list.pickle",
+        "crit_val_list2": BLD / "data" / "crit_val_list2.pickle",
     }
 )
 def task_get_simulation_draws(produces):
