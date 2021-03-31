@@ -138,7 +138,10 @@ def task_bad_lhd(depends_on, produces):
     ax.set_ylabel("$F(x_2)$")
     ax.set_xlabel("$F(x_1)$")
 
-    bad = np.array([[i / 10, i / 10] for i in range(10)]) + 0.05
+    n = 10
+
+    bad = np.array([[i / n, i / n] for i in range(n)])
+    bad += np.random.default_rng().uniform(size=bad.shape) / n
     sns.regplot(
         x=bad[:, 0],
         y=bad[:, 1],
@@ -148,7 +151,6 @@ def task_bad_lhd(depends_on, produces):
         scatter_kws={"alpha": 0.4},
     )
 
-    n = len(bad[:, 0])
     for i in np.arange(0, 1, 1 / n):
         plt.axhline(i)
         plt.axvline(i)

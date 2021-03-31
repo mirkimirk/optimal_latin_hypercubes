@@ -197,7 +197,7 @@ def optimal_latin_hypercube_sample(
     S = _scale_down_points(S_3, center, radius, target_n_points)
     f = criterion_func(S)
 
-    # Second stage of algorithm - Newton-type optimization
+    # Second stage of algorithm - Newton-type optimization (with estimagic?)
     if lhs_design == "released":
         pass
 
@@ -480,4 +480,4 @@ def _extend_upscaled_lhs_sample(empty_bins, target_n_points, lhs_design="random"
     return sample
 
 
-first_sample = optimal_latin_hypercube_sample(10, 5)[1]
+first_sample = optimal_latin_hypercube_sample(10, 5)[0]

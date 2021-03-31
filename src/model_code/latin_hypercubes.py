@@ -205,11 +205,11 @@ def optimal_latin_hypercube_sample(
     S = _scale_down_points(S_3, center, radius, target_n_points)
     f = criterion_func(S)
 
-    # Second stage of algorithm - Newton-type optimization
+    # Second stage of algorithm - Newton-type optimization (with estimagic?)
     if lhs_design == "released":
         pass
 
-    return f, S
+    return S, f, crit_vals_in_each_iteration
 
 
 def _step_1(criterion_func, sample, numActive):
