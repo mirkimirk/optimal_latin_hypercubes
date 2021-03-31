@@ -45,6 +45,7 @@ def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numAct
         center=first_center,
         radius=first_radius,
         target_n_points=target_n_points,
+        dim=2,
         optimality_criterion=optimality_criterion,
         lhs_design=lhs_design,
         numActive=numActive,
@@ -65,15 +66,14 @@ def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numAct
         center=second_center,
         radius=second_radius,
         target_n_points=target_n_points,
+        dim=2,
         existing_points=existing,
         optimality_criterion=optimality_criterion,
         lhs_design=lhs_design,
         numActive=numActive,
     )[1]
 
-    full_region = optimal_latin_hypercube_sample(
-        30,
-    )[1]
+    full_region = optimal_latin_hypercube_sample(20, 2)[1]
 
     return first_sample, second_sample, full_region
 

@@ -25,15 +25,17 @@ OPTIMALITY_CRITERIA = {
 
 def optimal_latin_hypercube_sample(
     target_n_points,
+    dim,
     S_init=None,
-    center=np.ones(2) * 0.5,
+    center=None,
     radius=0.5,
     existing_points=None,
     optimality_criterion="d-optimal",
     lhs_design="centered",
     numActive=3,
     numRand=None,
-    n_iter=100,
+    n_tries=10,
+    n_iter=None,
 ):
     """Generate the optimal (midpoint) Latin hypercube sample (O(M)Lhd).
 
@@ -56,6 +58,8 @@ def optimal_latin_hypercube_sample(
         Target number of points in the trust region at which criterion
         values are known. The actual number can be larger than this
         if the existing points are badly spaced.
+    dim : int
+        Number of variables to create.
     S_init : np.ndarray, optional
         An existing midpoint Latin hypercube sample in the region of interested that can
         be used as a starting point for the algorithm. If not specified, a random Lhd
@@ -82,8 +86,15 @@ def optimal_latin_hypercube_sample(
     numRand : int, optional
         Number of random row pairs to try after successful finish of first stage to
         reduce risk of finding a non-optimal OMLhd. Default is 3 * target_n_points // 5.
+    n_tries : int, optional
+        Number of random MLhds to try out as a starting point of the algorithm. If
+        existing_points are supplied, the existing points are used in every try to
+        extend them with random points. So the starting points are less random than
+        if no existing_points were supplied.
     n_iter : int, optional
-        Number of random MLhds to try out as a starting point of the algorithm.
+        Number of iterations of the algorithm. Default is 100 iterations; for large
+        dimensional (> 8) designs, the default is 200 because less costly formulas are
+        used, which take longer to converge.
 
     Returns
     -------
@@ -93,86 +104,106 @@ def optimal_latin_hypercube_sample(
         Optimal (midpoint) Latin hypercube sample.
     """
     criterion_func = OPTIMALITY_CRITERIA[optimality_criterion]
-    dim = len(center)
+    threshold = 8
+    if (S_init is not None and dim != S_init.shape[1]) or (
+        center is not None and dim != len(center)
+    ):
+        raise ValueError(
+            "Dimensions implied by S_init or center contradict dimensions set by dim."
+        )
+    if center is None:
+        center = np.ones(dim) * 0.5
     if numRand is None:
         numRand = 3 * target_n_points // 5
+    if n_iter is None:
+        if dim < threshold:
+            n_iter = 100
+        else:
+            n_iter = 200
 
     f_candidates = []
     S_candidates = []
-    for _ in range(n_iter):
-        S_0 = S_init
-        if existing_points is None:
-            if S_0 is None:
-                upscaled_points = _create_upscaled_lhs_sample(
-                    dim=dim,
-                    n_samples=target_n_points,
-                    lhs_design="centered",
-                )
-                S_0 = _scale_down_points(
-                    upscaled_points, center, radius, target_n_points
-                )
 
+    crit_vals_in_each_iteration = []
+    current_best = None
+    for t in range(n_tries):
+        if t == 0 and S_init is not None:
+            S_0 = S_init
+        elif existing_points is not None:
+            existing_upscaled = _scale_up_points(
+                existing_points,
+                center,
+                radius,
+                target_n_points,
+            )
+            empty_bins = _get_empty_bin_info(existing_upscaled, target_n_points)
+            new = _extend_upscaled_lhs_sample(
+                empty_bins=empty_bins,
+                target_n_points=target_n_points,
+                lhs_design="centered",
+            )
+            S_0 = np.row_stack([existing_upscaled, new])
         else:
-            if S_0 is None:
-                existing_upscaled = _scale_up_points(
-                    existing_points,
-                    center,
-                    radius,
-                    target_n_points,
-                )
-                empty_bins = _get_empty_bin_info(existing_upscaled, target_n_points)
-                new = _extend_upscaled_lhs_sample(
-                    empty_bins=empty_bins,
-                    target_n_points=target_n_points,
-                    lhs_design="centered",
-                )
-                upscaled_points = np.row_stack([existing_upscaled, new])
-                S_0 = _scale_down_points(
-                    upscaled_points, center, radius, target_n_points
-                )
+            S_0 = _create_upscaled_lhs_sample(
+                dim=dim,
+                n_samples=target_n_points,
+                lhs_design="centered",
+            )
+        current_best = S_0
 
-        # Step 1
-        f_0, active_pairs = _step_1(
-            criterion_func=criterion_func, S=S_0, numActive=numActive
-        )
+        crit_vals = []
+        for _ in range(n_iter):
+            # Step 1
+            f_0, active_pairs = _step_1(
+                criterion_func=criterion_func, sample=current_best, numActive=numActive
+            )
 
-        # Step 2
-        f_1, S_1 = _step_2(
-            criterion_func=criterion_func,
-            dim=dim,
-            S=S_0,
-            crit_val=f_0,
-            n_pairs=numActive,
-            active_pairs=active_pairs,
-        )
+            # Step 2
+            f_1, S_1 = _step_2(
+                criterion_func=criterion_func,
+                dim=dim,
+                sample=current_best,
+                crit_val=f_0,
+                n_pairs=numActive,
+                active_pairs=active_pairs,
+                threshold=threshold,
+            )
 
-        # Double check with random pairs that are not the same as the active pairs
-        potential_random_pairs = np.array(
-            list(set(combinations(range(target_n_points), 2)) - set(active_pairs))
-        )
-        random_pairs = np.random.default_rng().choice(
-            a=potential_random_pairs,
-            size=numRand,
-            replace=False,
-            axis=0,
-            shuffle=False,  # saves some time
-        )
-        f_2, S_2 = _step_2(
-            criterion_func=criterion_func,
-            dim=dim,
-            S=S_1,
-            crit_val=f_1,
-            n_pairs=numRand,
-            active_pairs=random_pairs,
-        )
+            # Check with random pairs that are not the same as the previous active pairs
+            potential_random_pairs = np.array(
+                list(set(combinations(range(target_n_points), 2)) - set(active_pairs))
+            )
+            random_pairs = np.random.default_rng().choice(
+                a=potential_random_pairs,
+                size=numRand,
+                replace=False,
+                axis=0,
+                shuffle=False,  # saves some time and is unnecessary here
+            )
+            best_crit, current_best = _step_2(
+                criterion_func=criterion_func,
+                dim=dim,
+                sample=S_1,
+                crit_val=f_1,
+                n_pairs=numRand,
+                active_pairs=random_pairs,
+                threshold=threshold,
+            )
 
-        f_candidates.append(f_2)
-        S_candidates.append(S_2)
+            crit_vals.append(best_crit)
+
+        # Save each critical value to later plot convergence rate
+        crit_vals_in_each_iteration.append(crit_vals)
+
+        f_candidates.append(best_crit)
+        S_candidates.append(current_best)
 
     best = np.argmin(f_candidates)
 
-    f = f_candidates[best]
-    S = S_candidates[best]
+    S_3 = S_candidates[best]
+
+    S = _scale_down_points(S_3, center, radius, target_n_points)
+    f = criterion_func(S)
 
     # Second stage of algorithm - Newton-type optimization
     if lhs_design == "released":
@@ -181,7 +212,7 @@ def optimal_latin_hypercube_sample(
     return f, S
 
 
-def _step_1(criterion_func, S, numActive):
+def _step_1(criterion_func, sample, numActive):
     """
     Implement the first step of the first stage of Park's (1994) algorithm for OMLHD.
 
@@ -189,7 +220,7 @@ def _step_1(criterion_func, S, numActive):
     ----------
     criterion_func : function
         Objective function used to evaluate the quality of the Lhd samples.
-    S : np.ndarray
+    sample : np.ndarray
         Initial midpoint Latin hypercube sample to modify by the algorithm.
     numActive : int
         Number of row pairs of S to build and use for exchanging values in their
@@ -202,11 +233,11 @@ def _step_1(criterion_func, S, numActive):
     active_pairs : list of tuples
         List of active row pairs to evaluate in second step.
     """
-    crit_val = criterion_func(S)
-    n = len(S)
+    crit_val = criterion_func(sample)
+    n = len(sample)
     function_values = np.empty(n)
     for i in range(n):
-        function_values[i] = criterion_func(np.delete(arr=S, obj=i, axis=0))
+        function_values[i] = criterion_func(np.delete(arr=sample, obj=i, axis=0))
     pairing_candidates = np.argsort(function_values)
     # take the first numActive combinations of the first numActive pairing_candidates
     active_pairs = list(combinations(pairing_candidates[:numActive], 2))[:numActive]
@@ -214,7 +245,7 @@ def _step_1(criterion_func, S, numActive):
     return crit_val, active_pairs
 
 
-def _step_2(criterion_func, dim, S, crit_val, n_pairs, active_pairs):
+def _step_2(criterion_func, dim, sample, crit_val, n_pairs, active_pairs, threshold):
     """
     Implement the second step of the first stage of Park's (1994) algorithm for OMLHD.
 
@@ -224,7 +255,7 @@ def _step_2(criterion_func, dim, S, crit_val, n_pairs, active_pairs):
         Objective function used to evaluate the quality of the Lhd samples.
     dim : int
         Number of variables in the design space.
-    S : np.ndarray
+    sample : np.ndarray
         Initial midpoint Latin hypercube sample to modify by the algorithm.
     crit_val : float
         Value of objective function if initial sample is evaluated.
@@ -233,55 +264,75 @@ def _step_2(criterion_func, dim, S, crit_val, n_pairs, active_pairs):
         columns.
     active_pairs : list of tuples
         List of row pairs to evaluate in second step.
+    threshold : int
+        Amount of dimensions deemed too high for regular calculation so easier,
+        slower converging formulas are used.
 
     Returns
     -------
-    f_1 : float
+    crit_val : float
         Value of objective function if optimal sample is evaluated.
-    S : np.ndarray
+    sample_winning : np.ndarray
         Optimal (midpoint) Latin hypercube sample.
     """
-    it = (2 ** (dim - 1)) - 1
+    it_small_dim = (2 ** (dim - 1)) - 1
+    it_large_dim = 2 * dim - 3
     n_components = np.where(np.arange(dim + 1) % 2 == 0)[0][1:]
     # loop over even-numbered combinations
-    switching_components_list = [
+    switching_components_lists = [
         list(combinations(range(dim), i)) for i in n_components
     ]
-    # for i in n_components:
-    #     switching_components_list.append(list(combinations(range(dim), i)))
     # flatten list of lists
     switching_components = [
-        item for sublist in switching_components_list for item in sublist
+        item for sublist in switching_components_lists for item in sublist
     ]
     i = 0
+    sample_winning = sample
     while i < n_pairs:
         active_pair = active_pairs[i]
         first_row = active_pair[0]
         second_row = active_pair[1]
-        function_values_step2 = np.empty(it)
-        for j in range(it):
-            switching_component = switching_components[j]
-            S_temp = S.copy()
-            S_temp[([first_row], [second_row]), switching_component] = S[
-                ([second_row], [first_row]), switching_component
+        if (
+            dim < threshold
+        ):  # Arbitrary threshold; for large dim, following calcs are costly
+            function_values_step2 = np.empty(it_small_dim)
+            for j in range(it_small_dim):
+                switching_component = switching_components[j]
+                S_temp = sample.copy()
+                S_temp[([first_row], [second_row]), switching_component] = S_temp[
+                    ([second_row], [first_row]), switching_component
+                ]
+                function_values_step2[j] = criterion_func(S_temp)
+            winning_switch = switching_components[np.argmin(function_values_step2)]
+            S_temp = sample.copy()
+            S_temp[([first_row], [second_row]), winning_switch] = S_temp[
+                ([second_row], [first_row]), winning_switch
             ]
-            function_values_step2[j] = criterion_func(S_temp)
-        winning_switch = switching_components[np.argmin(function_values_step2)]
-        S_temp = S.copy()
-        S_temp[([first_row], [second_row]), winning_switch] = S[
-            ([second_row], [first_row]), winning_switch
-        ]
+        else:  # Saves evaluations of crit_val, but needs more iterations
+            function_values_step2 = np.empty(it_large_dim)
+            for j in range(dim):
+                S_temp = sample.copy()
+                S_temp[([first_row], [second_row]), j] = S_temp[
+                    ([second_row], [first_row]), j
+                ]
+                function_values_step2[j] = criterion_func(S_temp)
+            for j in range(1, dim - 2):
+                S_temp = sample.copy()
+                S_temp[([first_row], [second_row]), :j] = S_temp[
+                    ([second_row], [first_row]), :j
+                ]
+                function_values_step2[dim + j - 1] = criterion_func(S_temp)
         if criterion_func(S_temp) < crit_val:
-            S = S_temp
+            sample_winning = S_temp.copy()
             crit_val, active_pairs = _step_1(
-                criterion_func=criterion_func, S=S, numActive=n_pairs
+                criterion_func=criterion_func, sample=sample_winning, numActive=n_pairs
             )
             i = 0
             continue
         else:
             i += 1
 
-    return crit_val, S
+    return crit_val, sample_winning
 
 
 def _scale_up_points(points, center, radius, target_n_points):
@@ -384,14 +435,16 @@ def _create_upscaled_lhs_sample(dim, n_samples, lhs_design="centered"):
     """
     sample = np.zeros((n_samples, dim))
     for j in range(dim):
-        sample[:, j] = np.random.choice(n_samples, replace=False, size=n_samples)
+        sample[:, j] = np.random.default_rng().choice(
+            n_samples, replace=False, size=n_samples
+        )
 
     if lhs_design == "random":
-        sample += np.random.uniform(size=sample.shape)
+        sample += np.random.default_rng().uniform(size=sample.shape)
     elif lhs_design == "centered":
         sample += 0.5
     else:
-        raise ValueError("Invalid latin hypercube design.")
+        raise ValueError("Invalid Latin hypercube design.")
 
     return sample
 
@@ -416,22 +469,24 @@ def _extend_upscaled_lhs_sample(empty_bins, target_n_points, lhs_design="random"
     sample : np.ndarray
         Existing points extended to Lhd.
     """
-    mask = empty_bins == -1  # whats this for? "-1"?
+    mask = empty_bins == -1
     dim = empty_bins.shape[1]
     sample = np.zeros_like(empty_bins)
     for j in range(dim):
         empty = empty_bins[:, j].copy()
-        n_duplicates = mask[:, j].sum()  # whats this for?
-        empty[mask[:, j]] = np.random.choice(
+        n_duplicates = mask[:, j].sum()
+        empty[mask[:, j]] = np.random.default_rng().choice(
             target_n_points, replace=False, size=n_duplicates
         )
-        sample[:, j] = np.random.choice(empty, replace=False, size=len(empty))
+        sample[:, j] = np.random.default_rng().choice(
+            empty, replace=False, size=len(empty)
+        )
 
     if lhs_design == "random":
-        sample = sample + np.random.uniform(size=sample.shape)
+        sample = sample + np.random.default_rng().uniform(size=sample.shape)
     elif lhs_design == "centered":
         sample = sample + 0.5
     else:
-        raise ValueError("Invalid latin hypercube design.")
+        raise ValueError("Invalid Latin hypercube design.")
 
     return sample

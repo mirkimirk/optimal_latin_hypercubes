@@ -15,5 +15,4 @@ Welcome to the Optimal Latin Hypercube Sampling project's documentation!
     final
     model_code
     library
-    paper
     references

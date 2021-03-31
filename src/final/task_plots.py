@@ -23,7 +23,7 @@ from src.config import BLD
 )
 @pytask.mark.produces(BLD / "figures" / "plot.pdf")
 def task_plots(depends_on, produces):
-    """Convert negative numbers from string to np.nan.
+    """Draw plot that hints at trust region applications.
 
     Parameters
     ----------
@@ -78,7 +78,7 @@ def task_plots(depends_on, produces):
 )
 @pytask.mark.produces(BLD / "figures" / "plot_full.pdf")
 def task_full_plot(depends_on, produces):
-    """Convert negative numbers from string to np.nan.
+    """Draw the OMLhd found by Park's algorithm.
 
     Parameters
     ----------
@@ -90,7 +90,7 @@ def task_full_plot(depends_on, produces):
     Returns
     -------
     fig : figure
-        A plot showing a possible trust region application.
+        A plot.
     """
     fig, ax = plt.subplots()
     fig.suptitle("Showcase of Lhd algorithm")
@@ -110,6 +110,45 @@ def task_full_plot(depends_on, produces):
     )
 
     n = len(full[:, 0])
+    for i in np.arange(0, 1, 1 / n):
+        plt.axhline(i)
+        plt.axvline(i)
+
+    plt.savefig(produces)
+
+
+@pytask.mark.produces(BLD / "figures" / "bad_lhd.pdf")
+def task_bad_lhd(depends_on, produces):
+    """Draw an example for a bad Lhd.
+
+    Parameters
+    ----------
+    produces : path
+        Variable for pytask. Specifies location to output the plot to.
+
+    Returns
+    -------
+    fig : figure
+        A plot.
+    """
+    fig, ax = plt.subplots()
+    fig.suptitle("Example for a bad Lhd")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("$F(x_2)$")
+    ax.set_xlabel("$F(x_1)$")
+
+    bad = np.array([[i / 10, i / 10] for i in range(10)]) + 0.05
+    sns.regplot(
+        x=bad[:, 0],
+        y=bad[:, 1],
+        ax=ax,
+        fit_reg=False,
+        color="darkblue",
+        scatter_kws={"alpha": 0.4},
+    )
+
+    n = len(bad[:, 0])
     for i in np.arange(0, 1, 1 / n):
         plt.axhline(i)
         plt.axvline(i)
