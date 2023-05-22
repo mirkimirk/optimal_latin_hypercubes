@@ -10,7 +10,7 @@ import numpy as np
 import pytask
 
 from src.config import BLD
-from src.model_code.latin_hypercubes import optimal_latin_hypercube_sample
+from src.data_generator.latin_hypercubes import optimal_latin_hypercube_sample
 
 
 def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numActive=3):
