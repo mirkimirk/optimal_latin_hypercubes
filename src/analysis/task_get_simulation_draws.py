@@ -13,7 +13,7 @@ from src.config import BLD
 from src.data_generator.latin_hypercubes import optimal_latin_hypercube_sample
 
 
-def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numActive=3):
+def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numActive=5):
     """Draw two specified samples from different trust regions for later plotting.
 
     Parameters
@@ -38,7 +38,7 @@ def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numAct
         returns NaN if x was a negative integer before, else returns the input unchanged
     """
     np.random.seed(1234)
-    target_n_points = 10
+    target_n_points = 15
     first_center = np.ones(2) * 0.25
     first_radius = 0.25
     first_sample = optimal_latin_hypercube_sample(

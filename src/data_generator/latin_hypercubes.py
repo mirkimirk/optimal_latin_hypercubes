@@ -279,16 +279,19 @@ def _step_2(criterion_func, dim, sample, crit_val, n_pairs, active_pairs, thresh
     """
     it_small_dim = (2 ** (dim - 1)) - 1
     it_large_dim = 2 * dim - 3
-    # find out which even-numbered exchanges are possible (2, 4, 6 etc.)
-    n_components = np.where(np.arange(dim + 1) % 2 == 0)[0][1:]
-    # loop over even-numbered combinations
-    switching_components_lists = [
-        list(combinations(range(dim), i)) for i in n_components
-    ]
-    # flatten list of lists
-    switching_components = [
-        item for sublist in switching_components_lists for item in sublist
-    ]
+    cols_to_consider = dim // 2
+    switching_components = []
+    # Loop through columns to consider
+    for i in range(1, cols_to_consider + 1):
+        # Special case: dim is even and i equals columns_to_consider. To avoid overlappings
+        if dim % 2 == 0 and i == cols_to_consider:
+            curr_combinations = filter(lambda x: 0 in x, combinations(range(dim), i))
+        # Regular case: as long as i < columns_to_consider, do this
+        else:
+            curr_combinations = combinations(range(dim), i)
+
+        # Update switching components list
+        switching_components.extend(curr_combinations)
     i = 0
     sample_winning = sample
     while i < n_pairs:
