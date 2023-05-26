@@ -9,6 +9,7 @@ second stage is not yet implemented.)
 from itertools import combinations
 
 import numpy as np
+from scipy.spatial.distance import cdist
 
 import src.data_generator.latin_hypercubes_aux as aux
 
@@ -18,10 +19,11 @@ import src.data_generator.latin_hypercubes_aux as aux
 OPTIMALITY_CRITERIA = {
     "a-optimal": lambda x: np.linalg.inv(x.T @ x).trace(),
     "d-optimal": lambda x: np.linalg.det(np.linalg.inv(x.T @ x)),
-    "e-optimal": lambda x: np.amin(np.linalg.eig(x.T @ x)[0])
-    * (-1),  # argmax of minimal eigenvalue = argmin of negative minimal eigenvalue
+    # argmax of minimal eigenvalue = argmin of negative minimal eigenvalue
+    "e-optimal": lambda x: (-1) * np.amin(np.linalg.eig(x.T @ x)[0]),
     "t-optimal": lambda x: np.trace(x.T @ x) * (-1),
     "g-optimal": lambda x: np.amax(np.diagonal(x @ np.linalg.inv(x.T @ x) @ x.T)),
+    "maximin": lambda x: (-1) * np.min(np.triu(cdist(x, x)))
 }
 
 
@@ -119,9 +121,9 @@ def optimal_latin_hypercube_sample(
         numRand = 3 * target_n_points // 5
     if n_iter is None:
         if dim < threshold:
-            n_iter = 20
+            n_iter = 100
         else:
-            n_iter = 40
+            n_iter = 200
 
     f_candidates = []
     S_candidates = []

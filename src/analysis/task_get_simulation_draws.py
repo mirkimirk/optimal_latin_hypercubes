@@ -9,11 +9,11 @@ import pickle
 import numpy as np
 import pytask
 
-from src.config import BLD
+from src.config import BLD, SRC
 from src.data_generator.latin_hypercubes import optimal_latin_hypercube_sample
 
 
-def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numActive=5):
+def draw_samples(optimality_criterion="maximin", lhs_design="centered", numActive=5):
     """Draw two specified samples from different trust regions for later plotting.
 
     Parameters
@@ -37,7 +37,7 @@ def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numAct
     second_sample : np.ndarray
         returns NaN if x was a negative integer before, else returns the input unchanged
     """
-    np.random.seed(1234)
+    # np.random.seed(1234)
     target_n_points = 15
     first_center = np.ones(2) * 0.25
     first_radius = 0.25
@@ -73,8 +73,9 @@ def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numAct
         numActive=numActive,
     )[0]
 
-    full_region, F_crit, crit_val_list = optimal_latin_hypercube_sample(15, 2)
-    full_region2, F_crit2, crit_val_list2 = optimal_latin_hypercube_sample(15, 2)
+    full_region, F_crit, crit_val_list = optimal_latin_hypercube_sample(15, 2, optimality_criterion=optimality_criterion)
+    full_region2, F_crit2, crit_val_list2 = optimal_latin_hypercube_sample(15, 2, optimality_criterion=optimality_criterion)
+    print(F_crit, F_crit2)
 
     return (
         first_sample,
@@ -85,7 +86,7 @@ def draw_samples(optimality_criterion="d-optimal", lhs_design="centered", numAct
         crit_val_list2,
     )
 
-
+@pytask.mark.depends_on(SRC / "data_generator" / "latin_hypercubes.py")
 @pytask.mark.produces(
     {
         "first": BLD / "data" / "first.pickle",
