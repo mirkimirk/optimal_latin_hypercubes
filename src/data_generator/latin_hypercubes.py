@@ -23,7 +23,9 @@ OPTIMALITY_CRITERIA = {
     "e-optimal": lambda x: (-1) * np.amin(np.linalg.eig(x.T @ x)[0]),
     "t-optimal": lambda x: np.trace(x.T @ x) * (-1),
     "g-optimal": lambda x: np.amax(np.diagonal(x @ np.linalg.inv(x.T @ x) @ x.T)),
-    "maximin": lambda x: (-1) * np.min(np.triu(cdist(x, x)))
+    "maximin": lambda x: (-1) * np.min(
+        cdist(x, x)[np.triu_indices(x.shape[0], k=1)]
+    )
 }
 
 
@@ -78,7 +80,7 @@ def optimal_latin_hypercube_sample(
         the criterion has already been evaluated. This is ignored, if S_0 is provided.
     optimality_criterion : str, optional
         One of "a-optimal", "d-optimal", "e-optimal",
-        "t-optimal", "g-optimal".
+        "t-optimal", "g-optimal", or "maximin.
     lhs_design : str, optional
         One of "centered", "released". "Centered" places points in the middle of each
         bin and finds optimal midpoint Latin hypercube design. "Released" uses a
@@ -316,7 +318,7 @@ def _step_2(criterion_func, dim, sample, crit_val, n_pairs, active_pairs, thresh
             S_temp[([first_row], [second_row]), winning_switch] = S_temp[
                 ([second_row], [first_row]), winning_switch
             ]
-        else:  # Saves evaluations of crit_val, but needs more iterations
+        else:  # Less evaluations of crit_val, but needs more iterations to converge
             function_values_step2 = np.empty(it_large_dim)
             for j in range(dim):
                 S_temp = sample.copy()

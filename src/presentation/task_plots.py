@@ -41,8 +41,8 @@ def task_plots(depends_on, produces):
     fig.suptitle("Illustration of trust region application with reused sample points")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    ax.set_ylabel("$F(x_2)$")
-    ax.set_xlabel("$F(x_1)$")
+    ax.set_ylabel("$F_{x_2}$")
+    ax.set_xlabel("$F_{x_1}$")
 
     first_sample = pickle.load(open(depends_on["first"], "rb"))
     second_sample = pickle.load(open(depends_on["second"], "rb"))
@@ -92,8 +92,8 @@ def task_full_plot(depends_on, produces):
     fig.suptitle("Showcase of Lhd algorithm")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    ax.set_ylabel("$F(x_2)$")
-    ax.set_xlabel("$F(x_1)$")
+    ax.set_ylabel("$F_{x_2}$")
+    ax.set_xlabel("$F_{x_1}$")
 
     full = pickle.load(open(depends_on, "rb"))
     sns.regplot(
@@ -134,8 +134,8 @@ def task_full2_plot(depends_on, produces):
     fig.suptitle("Another showcase of Lhd algorithm")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    ax.set_ylabel("$F(x_2)$")
-    ax.set_xlabel("$F(x_1)$")
+    ax.set_ylabel("$F_{x_2}$")
+    ax.set_xlabel("$F_{x_1}$")
 
     full = pickle.load(open(depends_on, "rb"))
     sns.regplot(
@@ -158,7 +158,8 @@ def task_full2_plot(depends_on, produces):
 @pytask.mark.depends_on(BLD / "data" / "crit_val_list.pickle")
 @pytask.mark.produces(BLD / "figures" / "plot_convergence.pdf")
 def task_crits_plot(depends_on, produces):
-    """Draw the OMLhd found by Park's algorithm.
+    """Plot the critical values for all iterations (of the first try defined by
+    n_tries).
 
     Parameters
     ----------
@@ -173,13 +174,13 @@ def task_crits_plot(depends_on, produces):
         A plot.
     """
     fig, ax = plt.subplots()
-    fig.suptitle("Showcase of Lhd algorithm")
+    fig.suptitle("Convergence of critical values")
     ax.set_ylabel("$Criterion Value$")
     ax.set_xlabel("$Iteration$")
 
-    full = pickle.load(open(depends_on, "rb"))
+    crit_vals_n_tries = pickle.load(open(depends_on, "rb"))
 
-    plt.plot(full[0])
+    plt.plot(crit_vals_n_tries[0])
 
     # for i in np.arange(0, 1, 1 / n):
     #     plt.axhline(i)
@@ -189,7 +190,7 @@ def task_crits_plot(depends_on, produces):
 
 
 @pytask.mark.produces(BLD / "figures" / "bad_lhd.pdf")
-def task_bad_lhd(depends_on, produces):
+def task_bad_lhd(produces):
     """Draw an example for a bad Lhd.
 
     Parameters
@@ -206,8 +207,8 @@ def task_bad_lhd(depends_on, produces):
     fig.suptitle("Example for a bad Lhd")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    ax.set_ylabel("$F(x_2)$")
-    ax.set_xlabel("$F(x_1)$")
+    ax.set_ylabel("$F_{x_2}$")
+    ax.set_xlabel("$F_{x_1}$")
 
     n = 10
 
