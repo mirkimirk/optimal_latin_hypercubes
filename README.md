@@ -22,3 +22,6 @@ optimal Latin hypercube design (OLhd). (Second stage still needs to be implement
 (Big parts of the code, especially in "latin_hypercubes_aux.py", were "inspired" by an
 implementation of Lhd sampling from another Python package, but I don't remember which
 one. I think SciPy.)
+
+## References
+Park, J.-S. (1994). Optimal Latin-hypercube designs for computer experiments. _Journal of Statistical Planning and Inference_, _39_(1), 95–111. [https://doi.org/10.1016/0378-3758(94)90115-5](https://doi.org/10.1016/0378-3758\(94\)90115-5)
